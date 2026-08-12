@@ -5,11 +5,18 @@
 
 ## 使用 How to use
 
-**直接打开网页 Open the scheduler:**
+**会员/球员 Members & players:**
 👉 https://thyewei1128.github.io/lim-badminton/
+- 🔍 输入名字查询自己的比赛时间和场地 (search your name → see your matches)
+- 🧑‍⚖️ 裁判按 Coach 选场地号，看自己场地的赛程 (coaches: pick your court number)
 
-- 输入各项目队伍数 → 按「生成赛程」 (Enter team counts → Generate Schedule)
-- 每组比赛固定同一场地，裁判用「打印场地表」的小组积分表记录成绩
+**管理员 Admin only:**
+👉 https://thyewei1128.github.io/lim-badminton/?admin
+- 设置队伍数、名单、抽签，按「🌐 发布到网站」把最新赛程更新给所有人
+- (Set teams/names, draw, then "Publish to Website" — everyone sees the update at the plain link)
+
+**赛制 Format:**
+- 每组比赛固定同一场地，裁判用「打印场地表」的小组积分表记录成绩 (胜=1分)
 - 普通场: 单局 30 分 · 半决赛/决赛: 21 分三局两胜
 - 每人只可报名 1 个项目 (One category per player)
 

@@ -186,8 +186,10 @@
     font-size: .85rem; font-weight: 700; color: var(--accent);
   }
   .cnext small { display: block; color: var(--ink2); font-weight: 500; }
-  /* members opening a shared link never see the settings — admin uses the base link */
+  /* members opening a shared link never see the settings — admin uses ?admin */
   body.shared .controls { display: none; }
+  /* stat tiles + overtime warnings are organizer info — members go straight to the court grid */
+  body.shared .tiles, body.shared .msg { display: none; }
 
   @media (max-width: 620px) {
     .wrap { padding: 14px 10px 40px; }
@@ -314,7 +316,9 @@
       <button class="ghost" id="csvBtn">下载 CSV (贴进 Google Sheet)</button>
       <button class="ghost" id="printBtn">打印 Print</button>
       <button class="ghost" id="shareBtn">🔗 分享赛程链接 Share Schedule Link</button>
+      <button class="ghost" id="pubBtn">🌐 发布到网站 Publish to Website</button>
     </div>
+    <div id="pubHelp" class="note"></div>
   </div>
 
   <div id="results"></div>
@@ -877,8 +881,8 @@ function doSearch() {
 }
 
 // ---------- share the exact schedule as a link (config packed into URL) ----------
-function encodeState() {
-  const d = {
+function stateObj() {
+  return {
     g: [clampInt('courts', 1, 30, 10), document.getElementById('hours').value, clampInt('matchMin', 5, 60, 15),
         clampInt('sfMin', 10, 90, 30), document.getElementById('startTime').value, document.getElementById('restGap').value],
     c: CATS.map(c => ({
@@ -888,24 +892,45 @@ function encodeState() {
       m: parseNames(c.key),
     })),
   };
-  return btoa(unescape(encodeURIComponent(JSON.stringify(d)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function encodeState() {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(stateObj())))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function applyState(d) {
+  const ids = ['courts', 'hours', 'matchMin', 'sfMin', 'startTime', 'restGap'];
+  ids.forEach((id, i) => { document.getElementById(id).value = d.g[i]; });
+  d.c.forEach((cd, i) => {
+    const k = CATS[i].key;
+    document.getElementById('n_' + k).value = cd.n;
+    document.getElementById('gs_' + k).value = cd.s;
+    document.getElementById('adv_' + k).value = cd.a;
+    document.getElementById('names_' + k).value = (cd.m || []).join('\n');
+  });
 }
 function loadFromHash() {
   const h = location.hash.match(/#d=([A-Za-z0-9_-]+)/);
   if (!h) return false;
   try {
-    const d = JSON.parse(decodeURIComponent(escape(atob(h[1].replace(/-/g, '+').replace(/_/g, '/')))));
-    const ids = ['courts', 'hours', 'matchMin', 'sfMin', 'startTime', 'restGap'];
-    ids.forEach((id, i) => { document.getElementById(id).value = d.g[i]; });
-    d.c.forEach((cd, i) => {
-      const k = CATS[i].key;
-      document.getElementById('n_' + k).value = cd.n;
-      document.getElementById('gs_' + k).value = cd.s;
-      document.getElementById('adv_' + k).value = cd.a;
-      document.getElementById('names_' + k).value = (cd.m || []).join('\n');
-    });
+    applyState(JSON.parse(decodeURIComponent(escape(atob(h[1].replace(/-/g, '+').replace(/_/g, '/'))))));
     return true;
   } catch (e) { return false; }
+}
+// publish the current schedule as config.json → upload to GitHub → the plain website link
+// shows this exact schedule to everyone (admin opens the site with ?admin to keep the controls)
+function publishConfig() {
+  generate();
+  const blob = new Blob([JSON.stringify(stateObj(), null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'config.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  document.getElementById('pubHelp').innerHTML =
+    `✅ <b>config.json 已下载。</b>接下来 Next:<br>
+     1️⃣ 在刚打开的 GitHub 页面，把下载的 <b>config.json</b> 拖进去 (drag the downloaded config.json into the GitHub page)<br>
+     2️⃣ 按绿色 <b>Commit changes</b><br>
+     3️⃣ 等 2-3 分钟 — 所有人打开网站就自动是最新赛程！(wait 2-3 min — everyone now sees this schedule at the plain link)`;
+  window.open('https://github.com/thyewei1128/lim-badminton/upload/main', '_blank');
 }
 function shareLink() {
   generate(); // make sure the link matches what's on screen
@@ -973,6 +998,20 @@ document.getElementById('courtBtn').addEventListener('click', printCourtSheets);
 document.getElementById('sheetBtn').addEventListener('click', printScoreSheets);
 document.getElementById('csvBtn').addEventListener('click', downloadCSV);
 document.getElementById('printBtn').addEventListener('click', () => window.print());
-if (loadFromHash()) document.body.classList.add('shared'); // opened from a shared link: player view, settings tucked away
-generate();
+document.getElementById('pubBtn').addEventListener('click', publishConfig);
+
+// boot: #d= link (frozen snapshot) → else published config.json (always-latest) → else defaults.
+// ?admin keeps the settings panel visible in every case.
+(async function boot() {
+  const isAdmin = /[?&]admin/.test(location.search);
+  let shared = loadFromHash();
+  if (!shared) {
+    try {
+      const r = await fetch('config.json?v=' + Date.now(), { cache: 'no-store' });
+      if (r.ok) { applyState(await r.json()); shared = true; }
+    } catch (e) { /* no published config yet — use defaults */ }
+  }
+  if (shared && !isAdmin) document.body.classList.add('shared');
+  generate();
+})();
 </script>
