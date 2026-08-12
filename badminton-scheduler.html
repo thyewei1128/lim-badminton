@@ -1037,7 +1037,15 @@ document.getElementById('roleC').addEventListener('click', () => setRole('coach'
 document.getElementById('coachCourt').addEventListener('change', renderCoachView);
 document.getElementById('q').addEventListener('input', doSearch);
 document.getElementById('shareBtn').addEventListener('click', shareLink);
-document.getElementById('genBtn').addEventListener('click', generate);
+// with a saved token, Generate publishes to the website in the same click
+function refreshGenLabel() {
+  document.getElementById('genBtn').textContent = localStorage.getItem('ghToken')
+    ? '生成赛程 + 自动发布 Generate & Publish' : '生成赛程 Generate Schedule';
+}
+document.getElementById('genBtn').addEventListener('click', () => {
+  generate();
+  if (localStorage.getItem('ghToken')) publishConfig();
+});
 document.getElementById('drawBtn').addEventListener('click', drawNames);
 document.getElementById('courtBtn').addEventListener('click', printCourtSheets);
 document.getElementById('sheetBtn').addEventListener('click', printScoreSheets);
@@ -1047,9 +1055,11 @@ document.getElementById('pubBtn').addEventListener('click', publishConfig);
 document.getElementById('ghToken').value = localStorage.getItem('ghToken') || '';
 document.getElementById('ghTokenSave').addEventListener('click', () => {
   const v = document.getElementById('ghToken').value.trim();
-  if (v) { localStorage.setItem('ghToken', v); document.getElementById('pubHelp').textContent = '✅ Token 已保存在这台设备。现在「🌐 发布到网站」一按就自动更新。Saved — Publish is now one-click.'; }
+  if (v) { localStorage.setItem('ghToken', v); document.getElementById('pubHelp').textContent = '✅ Token 已保存在这台设备。现在「生成赛程」一按 = 排场 + 自动发布。Saved — Generate now schedules AND publishes in one click.'; }
   else { localStorage.removeItem('ghToken'); document.getElementById('pubHelp').textContent = 'Token 已清除 (回到手动发布模式)。Token cleared — back to manual publish.'; }
+  refreshGenLabel();
 });
+refreshGenLabel();
 
 // boot: #d= link (frozen snapshot) → else published config.json (always-latest) → else defaults.
 // ?admin keeps the settings panel visible in every case.
