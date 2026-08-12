@@ -188,8 +188,8 @@
   .cnext small { display: block; color: var(--ink2); font-weight: 500; }
   /* members opening a shared link never see the settings — admin uses ?admin */
   body.shared .controls { display: none; }
-  /* stat tiles + overtime warnings are organizer info — members go straight to the court grid */
-  body.shared .tiles, body.shared .msg { display: none; }
+  /* overtime warnings suggest changing settings — organizer info only; members keep the stat tiles */
+  body.shared .msg { display: none; }
 
   @media (max-width: 620px) {
     .wrap { padding: 14px 10px 40px; }
