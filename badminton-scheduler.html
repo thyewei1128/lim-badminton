@@ -203,7 +203,10 @@
     .gtabx th, .gtabx td { border: .8pt solid #555; padding: 1.6mm 2mm; font-size: 9.5pt; text-align: center; height: 8mm; }
     .gtabx th { background: #eee; height: auto; }
     .gtabx .tn { text-align: left; font-weight: 600; }
-    .gtabx td.diag { background: #ccc; }
+    .gtabx td.diag {
+      background: #ccc; color: #777; font-weight: 700; font-size: 11pt;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
     .nextinfo { font-size: 8pt; font-weight: 700; color: #1a4d3a; margin-top: 1mm; }
     .gnext { border: 1.5pt solid #1a4d3a; border-radius: 2mm; padding: 2mm 3mm; margin-top: 2mm; }
     .gnext-t { display: block; font-size: 8.5pt; font-weight: 700; color: #333; margin-bottom: 1mm; }
@@ -746,7 +749,7 @@ function printCourtSheets() {
         <div class="gexp">填法 How to fill: 每场比赛后，在<b>自己那一行</b>的格子写比分（自己分数在前），赢了打 ✓。积分 = ✓ 的总数。同分时: 先看两队交手谁赢；三队循环同分则比总得失分差。<br>Write the score in the row team's cell (own score first), tick ✓ for a win. Points = number of ✓. Tie: head-to-head first, then total point difference.</div>
         <table class="gtabx"><tr><th class="tn">队伍 Team</th>${g.teams.map((_, i) => `<th>vs ${i + 1}</th>`).join('')}<th>积分 Pts<br>(胜=1)</th><th>名次 Rank</th></tr>` +
         g.teams.map((t, i) =>
-          `<tr><td class="tn">${i + 1}. ${esc(t)}</td>${g.teams.map((_, j) => j === i ? '<td class="diag"></td>' : '<td></td>').join('')}<td></td><td></td></tr>`).join('') +
+          `<tr><td class="tn">${i + 1}. ${esc(t)}</td>${g.teams.map((_, j) => j === i ? '<td class="diag">╳</td>' : '<td></td>').join('')}<td></td><td></td></tr>`).join('') +
         `</table>`;
       if (g.name !== '—') { // tell the judge where each qualifier goes after the group
         const dests = [];
