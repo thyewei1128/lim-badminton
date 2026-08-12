@@ -204,7 +204,9 @@
     .gtabx .tn { text-align: left; font-weight: 600; }
     .gtabx td.diag { background: #ccc; }
     .nextinfo { font-size: 8pt; font-weight: 700; color: #1a4d3a; margin-top: 1mm; }
-    .gnext { font-size: 9.5pt; font-weight: 700; margin-top: 1.5mm; color: #1a4d3a; }
+    .gnext { border: 1.5pt solid #1a4d3a; border-radius: 2mm; padding: 2mm 3mm; margin-top: 2mm; }
+    .gnext-t { display: block; font-size: 8.5pt; font-weight: 700; color: #333; margin-bottom: 1mm; }
+    .gnext-line { font-size: 12pt; font-weight: 800; color: #1a4d3a; line-height: 1.5; }
   }
   @media (prefers-reduced-motion: no-preference) {
     button.primary { transition: filter .15s; }
@@ -748,9 +750,9 @@ function printCourtSheets() {
         const dests = [];
         for (let k = 1; k <= g.adv; k++) {
           const d = destOf(`${g.cat}:${g.name}:${k}`);
-          dests.push(`第 ${k} 名 ➜ ${d ? esc(d) : '冠军 🏆'}`);
+          dests.push(`${g.name}组 第 ${k} 名 ➜ ${d ? esc(d) : '冠军 🏆'}`);
         }
-        html += `<div class="gnext">${dests.join('　｜　')}</div>`;
+        html += `<div class="gnext"><span class="gnext-t">📣 算好名次后，请裁判通知出线队伍去下一场地 After ranking, send the qualifiers to:</span>${dests.map(d => `<div class="gnext-line">${d}</div>`).join('')}</div>`;
       }
       html += `</div>`;
     }
