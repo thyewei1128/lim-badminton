@@ -155,6 +155,31 @@
 
   .note { font-size: .78rem; color: var(--ink2); margin-top: 10px; }
 
+  .searchbox { margin-bottom: 16px; }
+  #q {
+    font: inherit; font-size: 1rem; padding: 10px 12px; border-radius: 8px; width: 100%;
+    border: 1px solid var(--line); background: var(--surface2); color: var(--ink);
+  }
+  #q:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .qhit {
+    display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline;
+    padding: 8px 10px; border-left: 4px solid var(--cc); background: var(--ccbg);
+    border-radius: 6px; margin-top: 8px; font-size: .86rem; color: var(--ink);
+  }
+  .qhit .qwhen { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--cc); }
+  .qhit .qfirst { background: var(--cc); color: var(--surface); border-radius: 5px; padding: 1px 7px; font-size: .72rem; margin-right: 4px; }
+  .cfg-toggle { margin-top: 10px; display: none; }
+  body.shared .controls { display: none; }
+  body.shared .cfg-toggle { display: inline-block; }
+  body.shared.show-cfg .controls { display: grid; }
+
+  @media (max-width: 620px) {
+    .wrap { padding: 14px 10px 40px; }
+    .top h1 { font-size: 1.18rem; }
+    .tiles { grid-template-columns: 1fr 1fr; }
+    .panel { padding: 12px; }
+  }
+
   details.namesbox { border: 1px solid var(--line); border-radius: 8px; background: var(--surface2); padding: 10px 12px; }
   details.namesbox summary { cursor: pointer; font-weight: 700; font-size: .88rem; color: var(--accent); }
   .names-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 10px; }
@@ -224,6 +249,13 @@
     <span class="org">马来西亚滨海林氏青年团 · 小组赛 + 淘汰赛 · 自动排场</span>
   </header>
 
+  <div class="panel searchbox">
+    <p class="eyebrow">🔍 查询我的比赛 Find My Matches</p>
+    <input id="q" type="search" placeholder="输入你的名字或队号 Type your name, e.g. 林小明 / T3" autocomplete="off">
+    <div id="qresults"></div>
+    <button class="ghost cfg-toggle" id="cfgToggle">⚙️ 显示/隐藏设置 Show/Hide Settings</button>
+  </div>
+
   <div class="panel controls">
     <div>
       <p class="eyebrow">全局设置 Global Settings</p>
@@ -259,6 +291,7 @@
       <button class="ghost" id="sheetBtn">打印计分表 Score Sheets</button>
       <button class="ghost" id="csvBtn">下载 CSV (贴进 Google Sheet)</button>
       <button class="ghost" id="printBtn">打印 Print</button>
+      <button class="ghost" id="shareBtn">🔗 分享赛程链接 Share Schedule Link</button>
     </div>
   </div>
 
@@ -655,6 +688,7 @@ function generate() {
   One category per player, so there are no cross-category clashes. All matches of a group are pinned to one court, and that court's judge tracks the group standings (printed at the bottom of each court sheet). T1, T2… are placeholders — map real names after the registration draw.</p>`;
 
   results.innerHTML = html;
+  doSearch(); // refresh "find my matches" results against the new schedule
 }
 
 // ---------- random draw: shuffle name lists, then regenerate ----------
@@ -788,11 +822,81 @@ function downloadCSV() {
   URL.revokeObjectURL(a.href);
 }
 
+// ---------- find my matches ----------
+function doSearch() {
+  const box = document.getElementById('qresults');
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  if (!lastRun || !q) { box.innerHTML = ''; return; }
+  const hits = lastRun.all
+    .filter(m => m.a.toLowerCase().includes(q) || m.b.toLowerCase().includes(q))
+    .sort((x, y) => x.slot - y.slot);
+  if (!hits.length) {
+    box.innerHTML = `<p class="note">找不到 — 请输入名单上的名字或队号 (如 T3)。Not found — use the name/team code on the draw list.</p>`;
+    return;
+  }
+  const { cfg } = lastRun;
+  box.innerHTML = hits.map((m, i) => {
+    const cat = CATS.find(c => c.key === m.cat);
+    const mine = m.a.toLowerCase().includes(q) ? m.a : m.b;
+    const opp = mine === m.a ? m.b : m.a;
+    return `<div class="qhit" style="--cc:var(--c-${m.cat});--ccbg:var(--c-${m.cat}-bg)">
+      ${i === 0 ? '<span class="qfirst">第一场 FIRST</span>' : ''}
+      <span class="qwhen">${timeAt(cfg.startTime, cfg.matchMin, m.slot)} · 场地 Court ${m.court + 1}</span>
+      <span>${esc(m.code)} · ${cat.zh} · ${esc(mine)} <small>vs</small> ${esc(opp)}</span>
+    </div>`;
+  }).join('') + `<p class="note">小组赛打完后，该场地裁判会告诉出线队伍下一场去哪个场地。After the group stage, your court's judge will direct qualifiers to their next court.</p>`;
+}
+
+// ---------- share the exact schedule as a link (config packed into URL) ----------
+function encodeState() {
+  const d = {
+    g: [clampInt('courts', 1, 30, 10), document.getElementById('hours').value, clampInt('matchMin', 5, 60, 15),
+        clampInt('sfMin', 10, 90, 30), document.getElementById('startTime').value, document.getElementById('restGap').value],
+    c: CATS.map(c => ({
+      n: clampInt('n_' + c.key, 0, 64, 0),
+      s: document.getElementById('gs_' + c.key).value,
+      a: document.getElementById('adv_' + c.key).value,
+      m: parseNames(c.key),
+    })),
+  };
+  return btoa(unescape(encodeURIComponent(JSON.stringify(d)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function loadFromHash() {
+  const h = location.hash.match(/#d=([A-Za-z0-9_-]+)/);
+  if (!h) return false;
+  try {
+    const d = JSON.parse(decodeURIComponent(escape(atob(h[1].replace(/-/g, '+').replace(/_/g, '/')))));
+    const ids = ['courts', 'hours', 'matchMin', 'sfMin', 'startTime', 'restGap'];
+    ids.forEach((id, i) => { document.getElementById(id).value = d.g[i]; });
+    d.c.forEach((cd, i) => {
+      const k = CATS[i].key;
+      document.getElementById('n_' + k).value = cd.n;
+      document.getElementById('gs_' + k).value = cd.s;
+      document.getElementById('adv_' + k).value = cd.a;
+      document.getElementById('names_' + k).value = (cd.m || []).join('\n');
+    });
+    return true;
+  } catch (e) { return false; }
+}
+function shareLink() {
+  generate(); // make sure the link matches what's on screen
+  const url = location.origin + location.pathname + '#d=' + encodeState();
+  const btn = document.getElementById('shareBtn');
+  const done = () => { btn.textContent = '✅ 已复制! 贴到 WhatsApp Copied — paste into WhatsApp'; setTimeout(() => { btn.textContent = '🔗 分享赛程链接 Share Schedule Link'; }, 3000); };
+  if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, () => prompt('复制这个链接 Copy this link:', url));
+  else prompt('复制这个链接 Copy this link:', url);
+  history.replaceState(null, '', url); // also show it in the address bar
+}
+
+document.getElementById('q').addEventListener('input', doSearch);
+document.getElementById('shareBtn').addEventListener('click', shareLink);
+document.getElementById('cfgToggle').addEventListener('click', () => document.body.classList.toggle('show-cfg'));
 document.getElementById('genBtn').addEventListener('click', generate);
 document.getElementById('drawBtn').addEventListener('click', drawNames);
 document.getElementById('courtBtn').addEventListener('click', printCourtSheets);
 document.getElementById('sheetBtn').addEventListener('click', printScoreSheets);
 document.getElementById('csvBtn').addEventListener('click', downloadCSV);
 document.getElementById('printBtn').addEventListener('click', () => window.print());
+if (loadFromHash()) document.body.classList.add('shared'); // opened from a shared link: player view, settings tucked away
 generate();
 </script>
