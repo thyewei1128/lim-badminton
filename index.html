@@ -302,6 +302,23 @@
       <p class="eyebrow">各项目队伍数 Teams per Category <span style="font-weight:500;color:var(--ink2);text-transform:none;letter-spacing:0">(双打 1 队 = 2 人 · doubles: 1 team = 2 players)</span></p>
       <div class="cat-grid" id="catGrid"></div>
     </div>
+    <details class="namesbox" id="tokenBox">
+      <summary>🔐 一次性设置: 全自动发布 One-time Setup: Fully-automatic Publish</summary>
+      <p class="note" style="margin:6px 0 8px">
+        贴上 GitHub Token 后，「🌐 发布到网站」一按就直接更新网站，不用再拖文件。<br>
+        Paste a GitHub token once, and Publish updates the website in one click — no more dragging files.<br>
+        1️⃣ 打开 <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a>
+        　2️⃣ Token name: <b>lim-badminton</b> · Expiration: 90 days
+        　3️⃣ Repository access → <b>Only select repositories</b> → 选 <b>lim-badminton</b>
+        　4️⃣ Permissions → Repository permissions → <b>Contents</b> → <b>Read and write</b>
+        　5️⃣ 按 Generate token → 复制 → 贴在下面 (copy it and paste below)
+      </p>
+      <div class="row2" style="max-width:520px">
+        <div class="field"><label>GitHub Token (只存在你这台设备 stays on this device only)</label>
+          <input id="ghToken" type="password" placeholder="github_pat_..." autocomplete="off"></div>
+        <div class="field" style="align-self:end"><button class="ghost" id="ghTokenSave">保存 Save</button></div>
+      </div>
+    </details>
     <details class="namesbox" id="namesBox">
       <summary>队伍名单 & 抽签 Team Names & Draw（可选 optional）</summary>
       <p class="note" style="margin:6px 0 0">每行一队，双打写 "名字 / 名字"。填了名单，上面的队伍数会自动跟着名单走。<br>
@@ -915,10 +932,11 @@ function loadFromHash() {
     return true;
   } catch (e) { return false; }
 }
-// publish the current schedule as config.json → upload to GitHub → the plain website link
-// shows this exact schedule to everyone (admin opens the site with ?admin to keep the controls)
-function publishConfig() {
-  generate();
+// publish the current schedule as config.json → the plain website link shows this exact
+// schedule to everyone (admin opens the site with ?admin to keep the controls).
+// With a saved GitHub token: fully automatic. Without: download + drag into GitHub.
+const GH_REPO = 'thyewei1128/lim-badminton';
+function publishManual() {
   const blob = new Blob([JSON.stringify(stateObj(), null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -926,11 +944,38 @@ function publishConfig() {
   a.click();
   URL.revokeObjectURL(a.href);
   document.getElementById('pubHelp').innerHTML =
-    `✅ <b>config.json 已下载。</b>接下来 Next:<br>
-     1️⃣ 在刚打开的 GitHub 页面，把下载的 <b>config.json</b> 拖进去 (drag the downloaded config.json into the GitHub page)<br>
-     2️⃣ 按绿色 <b>Commit changes</b><br>
-     3️⃣ 等 2-3 分钟 — 所有人打开网站就自动是最新赛程！(wait 2-3 min — everyone now sees this schedule at the plain link)`;
-  window.open('https://github.com/thyewei1128/lim-badminton/upload/main', '_blank');
+    `📄 <b>config.json 已下载。</b>接下来 Next:<br>
+     1️⃣ 在刚打开的 GitHub 页面，把下载的 <b>config.json</b> 拖进去 (drag it into the GitHub page)<br>
+     2️⃣ 按绿色 <b>Commit changes</b> — 等 2-3 分钟大家就看到最新赛程<br>
+     💡 想要一按全自动？打开上面「🔐 一次性设置」。(Want one-click publish? See the 🔐 setup above.)`;
+  window.open(`https://github.com/${GH_REPO}/upload/main`, '_blank');
+}
+async function publishConfig() {
+  generate();
+  const token = localStorage.getItem('ghToken') || '';
+  if (!token) { publishManual(); return; }
+  const help = document.getElementById('pubHelp');
+  help.textContent = '⏳ 发布中 Publishing…';
+  try {
+    const api = `https://api.github.com/repos/${GH_REPO}/contents/config.json`;
+    const headers = { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' };
+    let sha;
+    const cur = await fetch(api, { headers });
+    if (cur.ok) sha = (await cur.json()).sha;
+    const r = await fetch(api, {
+      method: 'PUT', headers,
+      body: JSON.stringify({
+        message: '更新赛程 Update tournament schedule',
+        content: btoa(unescape(encodeURIComponent(JSON.stringify(stateObj(), null, 2)))),
+        ...(sha ? { sha } : {}),
+      }),
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    help.innerHTML = '✅ <b>已发布 Published!</b> 2-3 分钟后，所有人打开网站就是这份最新赛程。Everyone sees this schedule at the plain link in 2-3 minutes.';
+  } catch (e) {
+    publishManual();
+    help.innerHTML = `❌ 自动发布失败 (${esc(e.message)}) — Token 可能过期或权限不对，请到「🔐 一次性设置」重新贴一个。先用手动方式:<br>` + help.innerHTML;
+  }
 }
 function shareLink() {
   generate(); // make sure the link matches what's on screen
@@ -999,6 +1044,12 @@ document.getElementById('sheetBtn').addEventListener('click', printScoreSheets);
 document.getElementById('csvBtn').addEventListener('click', downloadCSV);
 document.getElementById('printBtn').addEventListener('click', () => window.print());
 document.getElementById('pubBtn').addEventListener('click', publishConfig);
+document.getElementById('ghToken').value = localStorage.getItem('ghToken') || '';
+document.getElementById('ghTokenSave').addEventListener('click', () => {
+  const v = document.getElementById('ghToken').value.trim();
+  if (v) { localStorage.setItem('ghToken', v); document.getElementById('pubHelp').textContent = '✅ Token 已保存在这台设备。现在「🌐 发布到网站」一按就自动更新。Saved — Publish is now one-click.'; }
+  else { localStorage.removeItem('ghToken'); document.getElementById('pubHelp').textContent = 'Token 已清除 (回到手动发布模式)。Token cleared — back to manual publish.'; }
+});
 
 // boot: #d= link (frozen snapshot) → else published config.json (always-latest) → else defaults.
 // ?admin keeps the settings panel visible in every case.
