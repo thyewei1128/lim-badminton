@@ -186,6 +186,12 @@
     font-size: .85rem; font-weight: 700; color: var(--accent);
   }
   .cnext small { display: block; color: var(--ink2); font-weight: 500; }
+  .scorein {
+    width: 84px; font: inherit; font-size: .85rem; padding: 5px 7px; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--surface2); color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+  .scorein:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
   /* members opening a shared link never see the settings — admin uses ?admin */
   body.shared .controls { display: none; }
   /* overtime warnings suggest changing settings — organizer info only; members keep the stat tiles */
@@ -355,7 +361,7 @@ const CATS = [
   { key: 'XD', zh: '混双', en: 'Mixed Doubles' },
 ];
 const DEFAULT_TEAMS = { MS: 16, WS: 8, MD: 12, WD: 8, XD: 12 };
-const LETTERS = 'ABCDEFGHJKLMNP';
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const ROUND_LABEL = { 2: '决赛 Final', 4: '半决赛 SF', 8: '8强 QF', 16: '16强 R16', 32: '32强 R32', 64: '64强 R64' };
 const ROUND_CODE  = { 2: 'F', 4: 'SF', 8: 'QF', 16: 'R16', 32: 'R32', 64: 'R64' };
 
@@ -446,13 +452,15 @@ function mkMatch(cat, code, phase, roundLabel, a, b, tokens, deps, depth) {
   return { uid: ++UID, cat, code, phase, roundLabel, a, b, tokens, deps, depth, slot: null, court: null };
 }
 
-// Build all matches for one category. Returns {matches, groups, notes, summary}
-function buildCategory(cfg) {
+// Build all matches for one category. Group letters are GLOBAL across categories
+// (e.g. MS gets A-D, WS gets E-F …) so "Group C" is unambiguous tournament-wide.
+function buildCategory(cfg, letterStart) {
   const { key, zh, teams: n, prefSize, advance } = cfg;
   const notes = [], matches = [], groups = [];
+  const GL = i => LETTERS[letterStart + i] || ('Z' + (letterStart + i - 25));
   if (n < 2) {
     if (n === 1) notes.push(`${zh}只有 1 队，无法比赛 (only 1 team — no matches)`);
-    return { matches, groups, notes, groupMatches: 0, koMatches: 0 };
+    return { matches, groups, notes, groupMatches: 0, koMatches: 0, lettersUsed: 0 };
   }
   const T = i => `${key}-T${i + 1}`;
   const L = i => (cfg.names && cfg.names[i]) || `T${i + 1}`; // display label: real name if drawn
@@ -461,13 +469,13 @@ function buildCategory(cfg) {
     // 少过 4 队: 直接打 (no group stage)
     if (n === 2) {
       matches.push(mkMatch(key, `${key} F`, 'ko', '决赛 Final', L(0), L(1), [T(0), T(1)], [], 1));
-    } else { // 3 teams → single round-robin, champion by wins (fairer than a bye)
+    } else { // 3 teams → single round-robin (gets its own group letter), champion by wins
       const pairs = [[0, 1], [0, 2], [1, 2]];
       pairs.forEach(([x, y], i) =>
-        matches.push(mkMatch(key, `${key} RR${i + 1}`, 'group', '循环赛 Round-robin', L(x), L(y), [T(x), T(y)], [], 0)));
-      notes.push(`${zh} 3 队：单循环 3 场，胜场多者冠军 (3 teams: round-robin, most wins = champion)`);
+        matches.push(mkMatch(key, `${GL(0)}${i + 1}`, 'group', `${GL(0)}组 循环赛 Round-robin`, L(x), L(y), [T(x), T(y)], [], 0)));
+      notes.push(`${zh} 3 队：${GL(0)}组单循环 3 场，积分最高者冠军 (3 teams: round-robin, most points = champion)`);
     }
-    return { matches, groups: [{ name: '—', teams: Array.from({ length: n }, (_, i) => L(i)), matchUids: matches.filter(m => m.phase === 'group').map(m => m.uid) }], notes, groupMatches: n === 2 ? 0 : 3, koMatches: n === 2 ? 1 : 0 };
+    return { matches, groups: [{ name: n === 3 ? GL(0) : '—', teams: Array.from({ length: n }, (_, i) => L(i)), matchUids: matches.filter(m => m.phase === 'group').map(m => m.uid) }], notes, groupMatches: n === 2 ? 0 : 3, koMatches: n === 2 ? 1 : 0, lettersUsed: n === 3 ? 1 : 0 };
   }
 
   // ---- group stage ----
@@ -475,7 +483,7 @@ function buildCategory(cfg) {
   let t = 0;
   const groupTeams = sizes.map((sz, gi) => {
     const arr = Array.from({ length: sz }, () => t++);
-    groups.push({ name: LETTERS[gi], teams: arr.map(i => L(i)), matchUids: [] });
+    groups.push({ name: GL(gi), teams: arr.map(i => L(i)), matchUids: [] });
     return arr;
   });
   if (sizes[sizes.length - 1] === 2) notes.push(`${zh}有一组只有 2 队 (one group has only 2 teams — 报名再多 1-2 队更好)`);
@@ -484,7 +492,7 @@ function buildCategory(cfg) {
   groupTeams.forEach((g, gi) => {
     let m = 0;
     for (let i = 0; i < g.length; i++) for (let j = i + 1; j < g.length; j++) {
-      const match = mkMatch(key, `${key} ${LETTERS[gi]}${++m}`, 'group', `${LETTERS[gi]}组 Group ${LETTERS[gi]}`,
+      const match = mkMatch(key, `${GL(gi)}${++m}`, 'group', `${GL(gi)}组 Group ${GL(gi)}`,
         L(g[i]), L(g[j]), [T(g[i]), T(g[j])], [], 0);
       matches.push(match); groupMatchUids.push(match.uid); groups[gi].matchUids.push(match.uid);
     }
@@ -495,8 +503,9 @@ function buildCategory(cfg) {
   const G = sizes.length;
   let koMatches = 0;
   if (G === 1) {
+    const gn = groups[0].name;
     if (advance === 2) {
-      matches.push(mkMatch(key, `${key} F`, 'ko', '决赛 Final', 'A①', 'A②', [`${key}:A:1`, `${key}:A:2`], groupMatchUids.slice(), 1));
+      matches.push(mkMatch(key, `${key} F`, 'ko', '决赛 Final', `${gn}①`, `${gn}②`, [`${key}:${gn}:1`, `${key}:${gn}:2`], groupMatchUids.slice(), 1));
       koMatches = 1;
       notes.push(`${zh}单组循环后，小组前 2 名打决赛 (single group → top 2 play the final)`);
     } else {
@@ -505,10 +514,10 @@ function buildCategory(cfg) {
   } else {
     // seeds: winners in group order, runners-up shifted by 1 (avoids same-group rematch in round 1)
     const seeds = [];
-    for (let gi = 0; gi < G; gi++) seeds.push({ label: `${LETTERS[gi]}①`, token: `${key}:${LETTERS[gi]}:1`, group: gi });
+    for (let gi = 0; gi < G; gi++) seeds.push({ label: `${groups[gi].name}①`, token: `${key}:${groups[gi].name}:1`, group: gi });
     if (advance === 2) for (let gi = 0; gi < G; gi++) {
       const src = (gi + 1) % G;
-      seeds.push({ label: `${LETTERS[src]}②`, token: `${key}:${LETTERS[src]}:2`, group: src });
+      seeds.push({ label: `${groups[src].name}②`, token: `${key}:${groups[src].name}:2`, group: src });
     }
     const Q = seeds.length, B = nextPow2(Q);
     const order = bracketOrder(B);
@@ -562,7 +571,7 @@ function buildCategory(cfg) {
       prev = next; roundSize /= 2; depth++;
     }
   }
-  return { matches, groups, notes, groupMatches, koMatches };
+  return { matches, groups, notes, groupMatches, koMatches, lettersUsed: sizes.length };
 }
 
 // ---------- scheduler: greedy slot filling, no team plays twice in a slot ----------
@@ -632,7 +641,12 @@ function generate() {
   UID = 0;
   const cfg = readConfig();
   const slotsAvail = Math.floor(cfg.hours * 60 / cfg.matchMin);
-  const built = cfg.cats.map(c => ({ cat: c, ...buildCategory(c) }));
+  let letterOffset = 0;
+  const built = cfg.cats.map(c => {
+    const b = { cat: c, ...buildCategory(c, letterOffset) };
+    letterOffset += b.lettersUsed || 0;
+    return b;
+  });
   const all = built.flatMap(b => b.matches);
   // scoring format: regular matches = 1 game to 30; SF & Final = best of 3 games to 21 (longer court block)
   const sfSlots = Math.max(1, Math.ceil(cfg.sfMin / cfg.matchMin));
@@ -843,8 +857,9 @@ function printCourtSheets() {
         const dests = [];
         for (let k = 1; k <= g.adv; k++) {
           const d = destOf(`${g.cat}:${g.name}:${k}`);
-          dests.push(`${g.name}组 第 ${k} 名 ➜ ${d ? esc(d) : '冠军 🏆'}`);
+          if (d) dests.push(`${g.name}组 第 ${k} 名 ➜ ${esc(d)}`);
         }
+        if (!dests.length) dests.push(`${g.name}组 积分最高 = 冠军 🏆 highest points = champion`);
         html += `<div class="gnext"><span class="gnext-t">📣 算好名次后，请裁判通知出线队伍去下一场地 After ranking, send the qualifiers to:</span>${dests.map(d => `<div class="gnext-line">${d}</div>`).join('')}</div>`;
       }
       html += `</div>`;
@@ -993,7 +1008,22 @@ function shareLink() {
   else prompt('复制这个链接 Copy this link:', url);
 }
 
-// ---------- coach view: one court's schedule + its groups, phone-friendly ----------
+// ---------- coach view: one court's schedule + score entry, phone-friendly ----------
+const SCORE_KEY = 'coachScores'; // scores live on the coach's own phone (localStorage)
+function getScores() { try { return JSON.parse(localStorage.getItem(SCORE_KEY)) || {}; } catch (e) { return {}; } }
+function setScore(code, v) {
+  const s = getScores();
+  if (v) s[code] = v; else delete s[code];
+  localStorage.setItem(SCORE_KEY, JSON.stringify(s));
+}
+function reportScores(c) {
+  const sc = getScores();
+  const ms = lastRun.all.filter(m => m.court === c && sc[m.code]).sort((a, b) => a.slot - b.slot);
+  if (!ms.length) { document.getElementById('coachHint').textContent = '还没有填任何比分 No scores entered yet.'; return; }
+  const text = `🏸 场地 Court ${c + 1} 成绩报告 Score report:\n` +
+    ms.map(m => `${m.code}: ${m.a} vs ${m.b} = ${sc[m.code]}`).join('\n');
+  window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank');
+}
 function renderCoachView() {
   const box = document.getElementById('coachview');
   const sel = document.getElementById('coachCourt');
@@ -1002,8 +1032,9 @@ function renderCoachView() {
   if (isNaN(c)) { box.innerHTML = '<p class="note">请选择场地号 Select your court number.</p>'; return; }
   const { cfg, all, groupsList } = lastRun;
   const ms = all.filter(m => m.court === c).sort((a, b) => a.slot - b.slot);
+  const sc = getScores();
   let html = `<h3 class="cvtitle">场地 Court ${c + 1} — ${ms.length} 场比赛 matches</h3>`;
-  html += `<div style="overflow-x:auto"><table class="mlist"><thead><tr><th>时间 Time</th><th>场次 Match</th><th>对阵 Players</th></tr></thead><tbody>`;
+  html += `<div style="overflow-x:auto"><table class="mlist"><thead><tr><th>时间 Time</th><th>场次 Match</th><th>对阵 Players</th><th>比分 Score</th></tr></thead><tbody>`;
   for (const m of ms) {
     const cat = CATS.find(x => x.key === m.cat);
     let dest = '';
@@ -1013,17 +1044,21 @@ function renderCoachView() {
     }
     html += `<tr><td class="code" style="--cc:var(--c-${m.cat})">${timeAt(cfg.startTime, cfg.matchMin, m.slot)}</td>
       <td class="phase">${esc(m.code)}<br>${cat.zh} · ${m.special ? '21分×3局' : '单局30分'}</td>
-      <td>${esc(m.a)} vs ${esc(m.b)}${dest}</td></tr>`;
+      <td>${esc(m.a)} vs ${esc(m.b)}${dest}</td>
+      <td><input class="scorein" data-code="${esc(m.code)}" placeholder="30:22" value="${esc(sc[m.code] || '')}"></td></tr>`;
   }
-  html += `</tbody></table></div>`;
+  html += `</tbody></table></div>
+    <div class="actions" style="margin-top:10px"><button class="ghost" id="reportBtn" data-court="${c}">📤 WhatsApp 报告成绩给管理员 Send Scores to Admin</button><span id="coachHint" class="note"></span></div>`;
   for (const g of (groupsList || []).filter(x => x.court === c)) {
     const gcat = CATS.find(x => x.key === g.cat);
     html += `<div class="cnext">${gcat.zh} ${g.name === '—' ? '循环赛' : g.name + '组'}: ${g.teams.map(esc).join(' · ')}<small>胜=1分, 积分最高晋级。请用打印的积分表记录成绩。Win = 1 pt; record scores on the printed standings sheet.</small>`;
     if (g.name !== '—') {
+      let any = false;
       for (let k = 1; k <= g.adv; k++) {
         const d = destOf(`${g.cat}:${g.name}:${k}`);
-        html += `<div>第 ${k} 名 ➜ ${d ? esc(d) : '冠军 🏆'}</div>`;
+        if (d) { html += `<div>第 ${k} 名 ➜ ${esc(d)}</div>`; any = true; }
       }
+      if (!any) html += `<div>积分最高 = 冠军 🏆</div>`;
     }
     html += `</div>`;
   }
@@ -1041,6 +1076,12 @@ function setRole(r) {
 document.getElementById('roleP').addEventListener('click', () => setRole('player'));
 document.getElementById('roleC').addEventListener('click', () => setRole('coach'));
 document.getElementById('coachCourt').addEventListener('change', renderCoachView);
+document.getElementById('coachview').addEventListener('input', e => {
+  if (e.target.classList.contains('scorein')) setScore(e.target.dataset.code, e.target.value.trim());
+});
+document.getElementById('coachview').addEventListener('click', e => {
+  if (e.target.id === 'reportBtn') reportScores(parseInt(e.target.dataset.court, 10));
+});
 document.getElementById('q').addEventListener('input', doSearch);
 document.getElementById('shareBtn').addEventListener('click', shareLink);
 // with a saved token, Generate publishes to the website in the same click
