@@ -203,6 +203,8 @@
     .gtabx th { background: #eee; height: auto; }
     .gtabx .tn { text-align: left; font-weight: 600; }
     .gtabx td.diag { background: #ccc; }
+    .nextinfo { font-size: 8pt; font-weight: 700; color: #1a4d3a; margin-top: 1mm; }
+    .gnext { font-size: 9.5pt; font-weight: 700; margin-top: 1.5mm; color: #1a4d3a; }
   }
   @media (prefers-reduced-motion: no-preference) {
     button.primary { transition: filter .15s; }
@@ -560,7 +562,9 @@ function generate() {
     if (g.matchUids && g.matchUids.length) { g.cat = b.cat.key; g.adv = b.cat.advance; groupsList.push(g); }
   }));
   const usedSlots = scheduleAll(all, cfg.courts, cfg.restGap, groupsList);
-  lastRun = { cfg, built, all, usedSlots, slotsAvail, groupsList };
+  const tokenMatch = new Map(); // token → the match that uses it, e.g. "MS:A:1" → MS QF1
+  all.forEach(m => m.tokens.forEach(t => tokenMatch.set(t, m)));
+  lastRun = { cfg, built, all, usedSlots, slotsAvail, groupsList, tokenMatch };
 
   const total = all.length;
   const capacity = cfg.courts * slotsAvail;
@@ -682,12 +686,20 @@ function printScoreSheets() {
         <tr><td class="pl">${esc(m.b)}</td>${boxes}</tr>
       </table>
       <div class="swin">胜方 Winner: ______________　裁判 Umpire: ______________</div>
+      ${m.phase === 'ko' ? (() => { const d = destOf(`${m.cat}:W:${m.uid}`); return `<div class="swin"><b>${d ? '➜ 胜者去 Winner → ' + esc(d) : '🏆 本场胜方即冠军 Winner is the champion!'}</b></div>`; })() : ''}
     </div>`;
   }).join('') + '</div>';
   document.body.classList.add('sheets-mode');
   const cleanup = () => { document.body.classList.remove('sheets-mode'); window.removeEventListener('afterprint', cleanup); };
   window.addEventListener('afterprint', cleanup);
   window.print();
+}
+
+// where a qualifier/winner plays next: "MS QF1 · 16:45 · 场地5"
+function destOf(token) {
+  const n = lastRun.tokenMatch.get(token);
+  if (!n || n.slot === null) return null;
+  return `${n.code} · ${timeAt(lastRun.cfg.startTime, lastRun.cfg.matchMin, n.slot)} · 场地${n.court + 1}`;
 }
 
 // ---------- per-court referee schedules: one page per court ----------
@@ -705,11 +717,16 @@ function printCourtSheets() {
       </tr></thead><tbody>`;
     for (const m of ms) {
       const cat = CATS.find(x => x.key === m.cat);
+      let destLine = '';
+      if (m.phase === 'ko') { // tell the judge where to send the winner
+        const d = destOf(`${m.cat}:W:${m.uid}`);
+        destLine = `<div class="nextinfo">${d ? '➜ 胜者去 Winner → ' + esc(d) : '🏆 冠军 Champion!'}</div>`;
+      }
       html += `<tr>
         <td class="t">${timeAt(cfg.startTime, cfg.matchMin, m.slot)}</td>
         <td class="mc" style="--cc:var(--c-${m.cat})">${esc(m.code)}</td>
         <td class="ph">${cat.zh} ${m.cat} · ${esc(m.roundLabel)} · ${m.special ? '21分×3局' : '单局30分'}</td>
-        <td class="pv">${esc(m.a)}　vs　${esc(m.b)}</td>
+        <td class="pv">${esc(m.a)}　vs　${esc(m.b)}${destLine}</td>
         <td class="blank-score"></td><td class="blank-win"></td>
       </tr>`;
     }
@@ -726,7 +743,16 @@ function printCourtSheets() {
         <table class="gtabx"><tr><th class="tn">队伍 Team</th>${g.teams.map((_, i) => `<th>vs ${i + 1}</th>`).join('')}<th>胜场 Wins</th><th>名次 Rank</th></tr>` +
         g.teams.map((t, i) =>
           `<tr><td class="tn">${i + 1}. ${esc(t)}</td>${g.teams.map((_, j) => j === i ? '<td class="diag"></td>' : '<td></td>').join('')}<td></td><td></td></tr>`).join('') +
-        `</table></div>`;
+        `</table>`;
+      if (g.name !== '—') { // tell the judge where each qualifier goes after the group
+        const dests = [];
+        for (let k = 1; k <= g.adv; k++) {
+          const d = destOf(`${g.cat}:${g.name}:${k}`);
+          dests.push(`第 ${k} 名 ➜ ${d ? esc(d) : '冠军 🏆'}`);
+        }
+        html += `<div class="gnext">${dests.join('　｜　')}</div>`;
+      }
+      html += `</div>`;
     }
     html += `</div>`;
   }
