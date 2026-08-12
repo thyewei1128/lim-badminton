@@ -1,0 +1,765 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>羽球赛程模拟器 · Badminton Scheduler</title>
+<style>
+  :root {
+    --bg: #f4f6f3;
+    --surface: #ffffff;
+    --surface2: #eef1ec;
+    --ink: #1c2b26;
+    --ink2: #5a6b63;
+    --line: #d9e0d9;
+    --accent: #0e7a5f;
+    --accent-ink: #ffffff;
+    --warn-bg: #fdf3e0;
+    --warn-ink: #8a5a10;
+    --crit-bg: #fbe9e5;
+    --crit-ink: #9c3320;
+    --ok-bg: #e6f2ec;
+    --c-MS: #2e6fd8; --c-MS-bg: #e8effc;
+    --c-WS: #d4527e; --c-WS-bg: #fbe9f0;
+    --c-MD: #0e8a6d; --c-MD-bg: #e4f3ee;
+    --c-WD: #8a5bd6; --c-WD-bg: #f0eafb;
+    --c-XD: #d97e1f; --c-XD-bg: #fbefe0;
+    --shadow: 0 1px 3px rgba(28,43,38,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131a17; --surface: #1c2521; --surface2: #232e29;
+      --ink: #e6ece8; --ink2: #94a49b; --line: #33403a;
+      --accent: #3dc79a; --accent-ink: #0d211a;
+      --warn-bg: #35290f; --warn-ink: #ecc06a;
+      --crit-bg: #391a13; --crit-ink: #f0917c;
+      --ok-bg: #17332a;
+      --c-MS: #7aa7f0; --c-MS-bg: #1c2a42;
+      --c-WS: #ef8db0; --c-WS-bg: #3c1f2b;
+      --c-MD: #52c9a8; --c-MD-bg: #163127;
+      --c-WD: #b593ee; --c-WD-bg: #2b2140;
+      --c-XD: #eda558; --c-XD-bg: #3a2a14;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6f3; --surface: #ffffff; --surface2: #eef1ec;
+    --ink: #1c2b26; --ink2: #5a6b63; --line: #d9e0d9;
+    --accent: #0e7a5f; --accent-ink: #ffffff;
+    --warn-bg: #fdf3e0; --warn-ink: #8a5a10;
+    --crit-bg: #fbe9e5; --crit-ink: #9c3320;
+    --ok-bg: #e6f2ec;
+    --c-MS: #2e6fd8; --c-MS-bg: #e8effc;
+    --c-WS: #d4527e; --c-WS-bg: #fbe9f0;
+    --c-MD: #0e8a6d; --c-MD-bg: #e4f3ee;
+    --c-WD: #8a5bd6; --c-WD-bg: #f0eafb;
+    --c-XD: #d97e1f; --c-XD-bg: #fbefe0;
+    --shadow: 0 1px 3px rgba(28,43,38,.08);
+  }
+  :root[data-theme="dark"] {
+    --bg: #131a17; --surface: #1c2521; --surface2: #232e29;
+    --ink: #e6ece8; --ink2: #94a49b; --line: #33403a;
+    --accent: #3dc79a; --accent-ink: #0d211a;
+    --warn-bg: #35290f; --warn-ink: #ecc06a;
+    --crit-bg: #391a13; --crit-ink: #f0917c;
+    --ok-bg: #17332a;
+    --c-MS: #7aa7f0; --c-MS-bg: #1c2a42;
+    --c-WS: #ef8db0; --c-WS-bg: #3c1f2b;
+    --c-MD: #52c9a8; --c-MD-bg: #163127;
+    --c-WD: #b593ee; --c-WD-bg: #2b2140;
+    --c-XD: #eda558; --c-XD-bg: #3a2a14;
+    --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Avenir Next", "Segoe UI", system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 20px 64px; }
+
+  header.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-bottom: 20px; }
+  .top h1 { font-size: 1.5rem; margin: 0; letter-spacing: .01em; }
+  .top .org { color: var(--ink2); font-size: .85rem; }
+
+  .eyebrow { font-size: .7rem; text-transform: uppercase; letter-spacing: .12em; color: var(--accent); font-weight: 700; margin: 0 0 8px; }
+
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; box-shadow: var(--shadow); }
+
+  .controls { display: grid; gap: 14px; }
+  .global-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
+  .cat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+
+  .cat-card { border: 1px solid var(--line); border-left: 4px solid var(--cc, var(--accent)); border-radius: 8px; padding: 10px 12px; background: var(--surface2); display: grid; gap: 8px; }
+  .cat-card .cat-name { font-weight: 700; font-size: .92rem; }
+  .cat-card .cat-name small { color: var(--ink2); font-weight: 500; margin-left: 4px; }
+  .field { display: grid; gap: 3px; }
+  .field label { font-size: .72rem; color: var(--ink2); letter-spacing: .02em; }
+  .field input, .field select {
+    font: inherit; font-size: .9rem; padding: 6px 8px; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); width: 100%;
+  }
+  .field input:focus, .field select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  button.primary {
+    font: inherit; font-weight: 700; font-size: .95rem; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink); border: none;
+    border-radius: 8px; padding: 10px 22px;
+  }
+  button.ghost {
+    font: inherit; font-size: .85rem; cursor: pointer; background: transparent;
+    color: var(--accent); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 14px;
+  }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 20px 0 14px; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; box-shadow: var(--shadow); }
+  .tile .v { font-size: 1.45rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .tile .k { font-size: .74rem; color: var(--ink2); margin-top: 2px; }
+  .tile.bad .v { color: var(--crit-ink); }
+
+  .msg { border-radius: 8px; padding: 10px 14px; font-size: .88rem; margin-bottom: 8px; }
+  .msg.warn { background: var(--warn-bg); color: var(--warn-ink); }
+  .msg.crit { background: var(--crit-bg); color: var(--crit-ink); }
+
+  h2.sec { font-size: 1.05rem; margin: 28px 0 10px; }
+  h2.sec small { color: var(--ink2); font-weight: 500; font-size: .8rem; margin-left: 8px; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: .78rem; color: var(--ink2); margin-bottom: 10px; align-items: center; }
+  .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+  .gridwrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); }
+  table.court { border-collapse: collapse; width: max-content; min-width: 100%; font-variant-numeric: tabular-nums; }
+  table.court th, table.court td { border: 1px solid var(--line); padding: 3px; text-align: center; }
+  table.court thead th { font-size: .72rem; padding: 6px 8px; background: var(--surface2); position: sticky; top: 0; }
+  table.court thead th.ot { background: var(--crit-bg); color: var(--crit-ink); }
+  table.court tbody th { font-size: .78rem; padding: 4px 10px; background: var(--surface2); position: sticky; left: 0; white-space: nowrap; }
+  td.slot { min-width: 92px; height: 44px; }
+  .chip {
+    display: block; border-radius: 6px; padding: 3px 6px; font-size: .68rem; line-height: 1.25;
+    background: var(--catbg); color: var(--cat); font-weight: 600; text-align: left;
+  }
+  .chip .who { display: block; font-weight: 500; opacity: .85; font-size: .64rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+
+  .catsec { margin-top: 18px; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--cc); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .catsec h3 { margin: 0 0 6px; font-size: .98rem; }
+  .catsec h3 small { color: var(--ink2); font-weight: 500; margin-left: 6px; }
+  .groups { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 10px; }
+  .groupbox { background: var(--surface2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: .8rem; }
+  .groupbox b { color: var(--cc); }
+  table.mlist { border-collapse: collapse; width: 100%; font-size: .82rem; font-variant-numeric: tabular-nums; }
+  table.mlist th { text-align: left; font-size: .7rem; color: var(--ink2); font-weight: 600; padding: 4px 10px 4px 0; border-bottom: 1px solid var(--line); }
+  table.mlist td { padding: 4px 10px 4px 0; border-bottom: 1px solid var(--line); }
+  table.mlist tr:last-child td { border-bottom: none; }
+  .code { font-weight: 700; color: var(--cc); white-space: nowrap; }
+  .phase { font-size: .7rem; color: var(--ink2); }
+
+  .note { font-size: .78rem; color: var(--ink2); margin-top: 10px; }
+
+  details.namesbox { border: 1px solid var(--line); border-radius: 8px; background: var(--surface2); padding: 10px 12px; }
+  details.namesbox summary { cursor: pointer; font-weight: 700; font-size: .88rem; color: var(--accent); }
+  .names-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 10px; }
+  .names-grid textarea {
+    font: inherit; font-size: .85rem; padding: 6px 8px; border-radius: 6px; resize: vertical;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); width: 100%; min-height: 110px;
+  }
+  .names-grid textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* ---- score sheets (print only) ---- */
+  #sheets { display: none; }
+  @media print {
+    .controls, .actions, .no-print { display: none !important; }
+    body { background: #fff; }
+    .gridwrap { overflow: visible; }
+    body.sheets-mode .wrap { display: none !important; }
+    body.sheets-mode #sheets { display: block; }
+    .sheetgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+    .scard { border: 1.2pt solid #444; border-left: 4mm solid var(--cc); border-radius: 2mm; padding: 3mm 4mm; break-inside: avoid; }
+    .scard .shead { display: flex; flex-wrap: wrap; gap: 2mm 4mm; align-items: baseline; font-size: 9pt; margin-bottom: 2mm; }
+    .scard .shead b { font-size: 12pt; color: var(--cc); }
+    table.stab { border-collapse: collapse; width: 100%; }
+    table.stab td { border: .8pt solid #666; padding: 2mm; font-size: 10pt; }
+    table.stab td.pl { width: 55%; font-weight: 600; }
+    table.stab td.box { height: 9mm; }
+    .scard .swin { font-size: 8.5pt; margin-top: 2mm; color: #333; }
+    /* per-court referee pages */
+    .courtpage { break-after: page; }
+    .courtpage:last-child { break-after: auto; }
+    .cphead { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2pt solid #222; margin-bottom: 3mm; padding-bottom: 2mm; }
+    .cpnum { font-size: 20pt; font-weight: 800; }
+    .cphead span:last-child { font-size: 9pt; color: #444; }
+    table.cptab { width: 100%; border-collapse: collapse; }
+    .cptab th, .cptab td { border: .8pt solid #555; padding: 1.8mm 2.5mm; font-size: 10pt; text-align: left; vertical-align: middle; }
+    .cptab th { background: #eee; font-size: 8.5pt; }
+    .cptab td.t { font-weight: 700; font-size: 11pt; white-space: nowrap; }
+    .cptab td.mc { font-weight: 800; color: var(--cc); white-space: nowrap; }
+    .cptab td.pv { font-weight: 600; }
+    .cptab td.blank-score { width: 20mm; }
+    .cptab td.blank-win { width: 26mm; }
+    .gsheet { margin-top: 5mm; break-inside: avoid; }
+    .gtitle { font-weight: 800; font-size: 11pt; color: var(--cc); margin-bottom: 1.5mm; }
+    .gtitle span { color: #444; font-weight: 600; font-size: 8.5pt; margin-left: 3mm; }
+    table.gtabx { width: 100%; border-collapse: collapse; }
+    .gtabx th, .gtabx td { border: .8pt solid #555; padding: 1.6mm 2mm; font-size: 9.5pt; text-align: center; height: 8mm; }
+    .gtabx th { background: #eee; height: auto; }
+    .gtabx .tn { text-align: left; font-weight: 600; }
+    .gtabx td.diag { background: #ccc; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    button.primary { transition: filter .15s; }
+    button.primary:hover { filter: brightness(1.08); }
+  }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>🏸 羽球赛程模拟器 <span style="font-weight:500;color:var(--ink2)">Court Scheduler</span></h1>
+    <span class="org">马来西亚滨海林氏青年团 · 小组赛 + 淘汰赛 · 自动排场</span>
+  </header>
+
+  <div class="panel controls">
+    <div>
+      <p class="eyebrow">全局设置 Global Settings</p>
+      <div class="global-grid">
+        <div class="field"><label>场地数 Courts</label><input id="courts" type="number" min="1" max="30" value="10"></div>
+        <div class="field"><label>总时长 (小时) Hours</label><input id="hours" type="number" min="1" max="12" step="0.5" value="4"></div>
+        <div class="field"><label>普通场用时 (分) · 30分单局</label><input id="matchMin" type="number" min="5" max="60" value="15"></div>
+        <div class="field"><label>半决/决赛用时 (分) · 21分×3局</label><input id="sfMin" type="number" min="10" max="90" value="30"></div>
+        <div class="field"><label>开始时间 Start</label><input id="startTime" type="time" value="14:00"></div>
+        <div class="field"><label>场间休息 Rest gap</label>
+          <select id="restGap">
+            <option value="0">无 none</option>
+            <option value="1" selected>≥1 场 (~15min)</option>
+            <option value="2">≥2 场 (~30min)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div>
+      <p class="eyebrow">各项目队伍数 Teams per Category <span style="font-weight:500;color:var(--ink2);text-transform:none;letter-spacing:0">(双打 1 队 = 2 人 · doubles: 1 team = 2 players)</span></p>
+      <div class="cat-grid" id="catGrid"></div>
+    </div>
+    <details class="namesbox" id="namesBox">
+      <summary>队伍名单 & 抽签 Team Names & Draw（可选 optional）</summary>
+      <p class="note" style="margin:6px 0 0">每行一队，双打写 "名字 / 名字"。填了名单，上面的队伍数会自动跟着名单走。<br>
+      One team per line; for doubles write "Name / Name". Team counts above sync to these lists automatically.</p>
+      <div class="names-grid" id="namesGrid"></div>
+    </details>
+    <div class="actions">
+      <button class="primary" id="genBtn">生成赛程 Generate Schedule</button>
+      <button class="ghost" id="drawBtn">🎲 随机抽签 Random Draw</button>
+      <button class="ghost" id="courtBtn">打印场地表 Court Sheets (裁判用)</button>
+      <button class="ghost" id="sheetBtn">打印计分表 Score Sheets</button>
+      <button class="ghost" id="csvBtn">下载 CSV (贴进 Google Sheet)</button>
+      <button class="ghost" id="printBtn">打印 Print</button>
+    </div>
+  </div>
+
+  <div id="results"></div>
+</div>
+
+<div id="sheets"></div>
+
+<script>
+'use strict';
+
+const CATS = [
+  { key: 'MS', zh: '男单', en: "Men's Singles" },
+  { key: 'WS', zh: '女单', en: "Women's Singles" },
+  { key: 'MD', zh: '男双', en: "Men's Doubles" },
+  { key: 'WD', zh: '女双', en: "Women's Doubles" },
+  { key: 'XD', zh: '混双', en: 'Mixed Doubles' },
+];
+const DEFAULT_TEAMS = { MS: 16, WS: 8, MD: 12, WD: 8, XD: 12 };
+const LETTERS = 'ABCDEFGHJKLMNP';
+const ROUND_LABEL = { 2: '决赛 Final', 4: '半决赛 SF', 8: '8强 QF', 16: '16强 R16', 32: '32强 R32', 64: '64强 R64' };
+const ROUND_CODE  = { 2: 'F', 4: 'SF', 8: 'QF', 16: 'R16', 32: 'R32', 64: 'R64' };
+
+// ---------- controls ----------
+const catGrid = document.getElementById('catGrid');
+for (const c of CATS) {
+  const div = document.createElement('div');
+  div.className = 'cat-card';
+  div.style.setProperty('--cc', `var(--c-${c.key})`);
+  div.innerHTML = `
+    <div class="cat-name">${c.zh} ${c.key}<small>${c.en}</small></div>
+    <div class="field"><label>队伍数 Teams</label><input id="n_${c.key}" type="number" min="0" max="64" value="${DEFAULT_TEAMS[c.key]}"></div>
+    <div class="row2">
+      <div class="field"><label>每组队数 Group size</label>
+        <select id="gs_${c.key}">${[3, 4, 5, 6, 7, 8].map(v => `<option value="${v}"${v === 4 ? ' selected' : ''}>${v} 队</option>`).join('')}</select></div>
+      <div class="field"><label>小组出线 Advance</label>
+        <select id="adv_${c.key}"><option value="2" selected>前 2 名</option><option value="1">第 1 名</option></select></div>
+    </div>`;
+  catGrid.appendChild(div);
+}
+
+const namesGrid = document.getElementById('namesGrid');
+for (const c of CATS) {
+  const div = document.createElement('div');
+  div.className = 'field';
+  div.innerHTML = `<label>${c.zh} ${c.key} — 一行一队 one team per line</label>
+    <textarea id="names_${c.key}" placeholder="${c.key === 'MS' || c.key === 'WS' ? '例如 e.g.\n林小明\n陈大文' : '例如 e.g.\n林小明 / 陈大文\n李强 / 王伟'}"></textarea>`;
+  namesGrid.appendChild(div);
+}
+
+function parseNames(key) {
+  return document.getElementById('names_' + key).value.split('\n').map(s => s.trim()).filter(Boolean);
+}
+
+function readConfig() {
+  return {
+    courts: clampInt('courts', 1, 30, 10),
+    hours: Math.max(0.5, parseFloat(document.getElementById('hours').value) || 4),
+    matchMin: clampInt('matchMin', 5, 60, 15),
+    sfMin: clampInt('sfMin', 10, 90, 30),
+    startTime: document.getElementById('startTime').value || '14:00',
+    restGap: parseInt(document.getElementById('restGap').value, 10),
+    cats: CATS.map(c => {
+      const names = parseNames(c.key);
+      let teams = clampInt('n_' + c.key, 0, 64, 0);
+      if (names.length >= 2) { // a filled name list overrides the team count
+        teams = Math.min(64, names.length);
+        document.getElementById('n_' + c.key).value = teams;
+      }
+      return {
+        ...c, teams,
+        names: names.length >= 2 ? names : null,
+        prefSize: parseInt(document.getElementById('gs_' + c.key).value, 10),
+        advance: parseInt(document.getElementById('adv_' + c.key).value, 10),
+      };
+    }),
+  };
+}
+function clampInt(id, lo, hi, dflt) {
+  const v = parseInt(document.getElementById(id).value, 10);
+  return isNaN(v) ? dflt : Math.min(hi, Math.max(lo, v));
+}
+
+// ---------- tournament engine ----------
+function nextPow2(n) { let p = 1; while (p < n) p *= 2; return p; }
+
+function splitGroups(n, pref) {
+  let best = null;
+  for (let g = 1; g <= Math.ceil(n / 2); g++) {
+    const base = Math.floor(n / g), rem = n % g;
+    const sizes = Array.from({ length: g }, (_, i) => base + (i < rem ? 1 : 0));
+    if (sizes[0] > Math.min(8, pref + 1)) continue; // no group bigger than requested size +1 (hard cap 8)
+    let score = Math.abs(n / g - pref) * 10;
+    if (sizes[g - 1] < 3) score += 60;   // avoid groups of 2 unless unavoidable
+    if (!best || score < best.score) best = { sizes, score };
+  }
+  return best ? best.sizes : [n];
+}
+
+function bracketOrder(B) { // standard seeding positions: seed 1 & 2 in opposite halves
+  let arr = [0];
+  while (arr.length < B) { const n = arr.length * 2; arr = arr.flatMap(x => [x, n - 1 - x]); }
+  return arr;
+}
+
+let UID = 0;
+function mkMatch(cat, code, phase, roundLabel, a, b, tokens, deps, depth) {
+  return { uid: ++UID, cat, code, phase, roundLabel, a, b, tokens, deps, depth, slot: null, court: null };
+}
+
+// Build all matches for one category. Returns {matches, groups, notes, summary}
+function buildCategory(cfg) {
+  const { key, zh, teams: n, prefSize, advance } = cfg;
+  const notes = [], matches = [], groups = [];
+  if (n < 2) {
+    if (n === 1) notes.push(`${zh}只有 1 队，无法比赛 (only 1 team — no matches)`);
+    return { matches, groups, notes, groupMatches: 0, koMatches: 0 };
+  }
+  const T = i => `${key}-T${i + 1}`;
+  const L = i => (cfg.names && cfg.names[i]) || `T${i + 1}`; // display label: real name if drawn
+
+  if (n < 4) {
+    // 少过 4 队: 直接打 (no group stage)
+    if (n === 2) {
+      matches.push(mkMatch(key, `${key} F`, 'ko', '决赛 Final', L(0), L(1), [T(0), T(1)], [], 1));
+    } else { // 3 teams → single round-robin, champion by wins (fairer than a bye)
+      const pairs = [[0, 1], [0, 2], [1, 2]];
+      pairs.forEach(([x, y], i) =>
+        matches.push(mkMatch(key, `${key} RR${i + 1}`, 'group', '循环赛 Round-robin', L(x), L(y), [T(x), T(y)], [], 0)));
+      notes.push(`${zh} 3 队：单循环 3 场，胜场多者冠军 (3 teams: round-robin, most wins = champion)`);
+    }
+    return { matches, groups: [{ name: '—', teams: Array.from({ length: n }, (_, i) => L(i)), matchUids: matches.filter(m => m.phase === 'group').map(m => m.uid) }], notes, groupMatches: n === 2 ? 0 : 3, koMatches: n === 2 ? 1 : 0 };
+  }
+
+  // ---- group stage ----
+  const sizes = splitGroups(n, prefSize);
+  let t = 0;
+  const groupTeams = sizes.map((sz, gi) => {
+    const arr = Array.from({ length: sz }, () => t++);
+    groups.push({ name: LETTERS[gi], teams: arr.map(i => L(i)), matchUids: [] });
+    return arr;
+  });
+  if (sizes[sizes.length - 1] === 2) notes.push(`${zh}有一组只有 2 队 (one group has only 2 teams — 报名再多 1-2 队更好)`);
+
+  const groupMatchUids = [];
+  groupTeams.forEach((g, gi) => {
+    let m = 0;
+    for (let i = 0; i < g.length; i++) for (let j = i + 1; j < g.length; j++) {
+      const match = mkMatch(key, `${key} ${LETTERS[gi]}${++m}`, 'group', `${LETTERS[gi]}组 Group ${LETTERS[gi]}`,
+        L(g[i]), L(g[j]), [T(g[i]), T(g[j])], [], 0);
+      matches.push(match); groupMatchUids.push(match.uid); groups[gi].matchUids.push(match.uid);
+    }
+  });
+  const groupMatches = matches.length;
+
+  // ---- knockout ----
+  const G = sizes.length;
+  let koMatches = 0;
+  if (G === 1) {
+    if (advance === 2) {
+      matches.push(mkMatch(key, `${key} F`, 'ko', '决赛 Final', 'A①', 'A②', [`${key}:A:1`, `${key}:A:2`], groupMatchUids.slice(), 1));
+      koMatches = 1;
+      notes.push(`${zh}单组循环后，小组前 2 名打决赛 (single group → top 2 play the final)`);
+    } else {
+      notes.push(`${zh}单组循环，小组第 1 名直接是冠军 (single group — group winner is champion)`);
+    }
+  } else {
+    // seeds: winners in group order, runners-up shifted by 1 (avoids same-group rematch in round 1)
+    const seeds = [];
+    for (let gi = 0; gi < G; gi++) seeds.push({ label: `${LETTERS[gi]}①`, token: `${key}:${LETTERS[gi]}:1`, group: gi });
+    if (advance === 2) for (let gi = 0; gi < G; gi++) {
+      const src = (gi + 1) % G;
+      seeds.push({ label: `${LETTERS[src]}②`, token: `${key}:${LETTERS[src]}:2`, group: src });
+    }
+    const Q = seeds.length, B = nextPow2(Q);
+    const order = bracketOrder(B);
+    const entries = order.map(ix => ix < Q ? seeds[ix] : null);
+
+    // round 1 pairs (positions 0-1, 2-3, ...); fix same-group clashes by swapping runners
+    const pairs = [];
+    for (let i = 0; i < B; i += 2) pairs.push([entries[i], entries[i + 1]]);
+    for (let i = 0; i < pairs.length; i++) {
+      const [a, b] = pairs[i];
+      if (a && b && a.group === b.group) {
+        for (let j = 0; j < pairs.length; j++) {
+          if (j === i) continue;
+          const [c, d] = pairs[j];
+          if (c && d && a.group !== d.group && c.group !== b.group) {
+            pairs[i][1] = d; pairs[j][1] = b; break;
+          }
+        }
+      }
+    }
+
+    let roundSize = B, prev = [], depth = 1;
+    // prev: participants for next round: {type:'seed',seed} | {type:'winner',match}
+    let rn = 0;
+    for (const [a, b] of pairs) {
+      if (a && b) {
+        const code = `${key} ${ROUND_CODE[roundSize]}${ROUND_CODE[roundSize] === 'F' ? '' : ++rn}`;
+        const m = mkMatch(key, code, 'ko', ROUND_LABEL[roundSize], a.label, b.label, [a.token, b.token], groupMatchUids.slice(), depth);
+        matches.push(m); koMatches++;
+        prev.push({ type: 'winner', match: m });
+      } else {
+        prev.push({ type: 'seed', seed: a || b }); // bye
+      }
+    }
+    roundSize /= 2; depth++;
+    while (prev.length > 1) {
+      const next = []; rn = 0;
+      for (let i = 0; i < prev.length; i += 2) {
+        const p1 = prev[i], p2 = prev[i + 1];
+        const lab = p => p.type === 'seed' ? p.seed.label : 'W·' + p.match.code.replace(key + ' ', '');
+        const tok = p => p.type === 'seed' ? p.seed.token : `${key}:W:${p.match.uid}`;
+        const deps = [];
+        if (p1.type === 'winner') deps.push(p1.match.uid);
+        if (p2.type === 'winner') deps.push(p2.match.uid);
+        if (!deps.length) deps.push(...groupMatchUids);
+        const code = `${key} ${ROUND_CODE[roundSize]}${ROUND_CODE[roundSize] === 'F' ? '' : ++rn}`;
+        const m = mkMatch(key, code, 'ko', ROUND_LABEL[roundSize], lab(p1), lab(p2), [tok(p1), tok(p2)], deps, depth);
+        matches.push(m); koMatches++;
+        next.push({ type: 'winner', match: m });
+      }
+      prev = next; roundSize /= 2; depth++;
+    }
+  }
+  return { matches, groups, notes, groupMatches, koMatches };
+}
+
+// ---------- scheduler: greedy slot filling, no team plays twice in a slot ----------
+function scheduleAll(all, courts, restGap, groupsList) {
+  const lastSlot = new Map(); // token → last slot it occupies (match end slot)
+  const catCount = {};
+  const catMaxDepth = {};
+  all.forEach(m => { catCount[m.cat] = 0; catMaxDepth[m.cat] = Math.max(catMaxDepth[m.cat] || 0, m.depth); });
+  // chain = KO rounds still to play after this match; longer chains get courts first
+  const chain = m => catMaxDepth[m.cat] - m.depth;
+  const byUid = new Map(all.map(m => [m.uid, m]));
+
+  // pin every group to ONE court so its judge sees all of its matches and can tally the standings.
+  // deep-bracket categories get dedicated courts first; shallow-bracket groups share courts when there
+  // are more groups than courts.
+  const courtLoad = Array(courts).fill(0);
+  const gsorted = [...(groupsList || [])].sort((a, b) =>
+    (catMaxDepth[b.cat] || 0) - (catMaxDepth[a.cat] || 0) || b.matchUids.length - a.matchUids.length);
+  for (const g of gsorted) {
+    let c = 0;
+    for (let i = 1; i < courts; i++) if (courtLoad[i] < courtLoad[c]) c = i;
+    g.court = c;
+    courtLoad[c] += g.matchUids.length;
+    for (const uid of g.matchUids) byUid.get(uid).fixedCourt = c;
+  }
+
+  const courtFree = Array(courts).fill(0); // first slot each court is free (long SF/F matches block several slots)
+  let remaining = all.length, s = 0;
+  while (remaining > 0 && s < 600) {
+    for (let c = 0; c < courts; c++) {
+      if (courtFree[c] > s) continue;
+      let pick = null;
+      for (const m of all) {
+        if (m.slot !== null) continue;
+        if (m.fixedCourt != null && m.fixedCourt !== c) continue; // group matches stay on their group's court
+        // a dependent match (e.g. SF after QF) waits until the feeder match ENDS plus the rest gap
+        if (!m.deps.every(d => { const dm = byUid.get(d); return dm.slot !== null && s - (dm.slot + dm.durSlots - 1) > restGap; })) continue;
+        if (m.tokens.some(t => lastSlot.has(t) && s - lastSlot.get(t) <= restGap)) continue;
+        if (!pick
+          || chain(m) > chain(pick)
+          || (chain(m) === chain(pick) && m.depth < pick.depth)
+          || (chain(m) === chain(pick) && m.depth === pick.depth && catCount[m.cat] < catCount[pick.cat])) pick = m;
+      }
+      if (!pick) continue;
+      pick.slot = s; pick.court = c;
+      courtFree[c] = s + pick.durSlots;
+      pick.tokens.forEach(t => lastSlot.set(t, s + pick.durSlots - 1));
+      catCount[pick.cat]++; remaining--;
+    }
+    s++;
+  }
+  return all.length ? Math.max(...all.map(m => m.slot + m.durSlots)) : 0;
+}
+
+// ---------- render ----------
+const results = document.getElementById('results');
+let lastRun = null;
+
+function timeAt(startTime, matchMin, slot) {
+  const [h, m] = startTime.split(':').map(Number);
+  const t = h * 60 + m + slot * matchMin;
+  return String(Math.floor(t / 60) % 24).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch])); }
+
+function generate() {
+  UID = 0;
+  const cfg = readConfig();
+  const slotsAvail = Math.floor(cfg.hours * 60 / cfg.matchMin);
+  const built = cfg.cats.map(c => ({ cat: c, ...buildCategory(c) }));
+  const all = built.flatMap(b => b.matches);
+  // scoring format: regular matches = 1 game to 30; SF & Final = best of 3 games to 21 (longer court block)
+  const sfSlots = Math.max(1, Math.ceil(cfg.sfMin / cfg.matchMin));
+  all.forEach(m => {
+    m.special = /半决赛|决赛/.test(m.roundLabel);
+    m.durSlots = m.special ? sfSlots : 1;
+  });
+  const groupsList = [];
+  built.forEach(b => b.groups.forEach(g => {
+    if (g.matchUids && g.matchUids.length) { g.cat = b.cat.key; g.adv = b.cat.advance; groupsList.push(g); }
+  }));
+  const usedSlots = scheduleAll(all, cfg.courts, cfg.restGap, groupsList);
+  lastRun = { cfg, built, all, usedSlots, slotsAvail, groupsList };
+
+  const total = all.length;
+  const capacity = cfg.courts * slotsAvail;
+  const overtime = Math.max(0, usedSlots - slotsAvail) * cfg.matchMin;
+  const endTime = timeAt(cfg.startTime, cfg.matchMin, usedSlots);
+
+  // shuttlecock estimate (friendly-match rates): regular 30-pt game ≈ 2, SF/F best-of-3 ≈ 4, +10% buffer
+  const specialCount = all.filter(m => m.special).length;
+  const shuttles = Math.ceil((total - specialCount) * 2 + specialCount * 4) ;
+  const shuttlesBuf = Math.ceil(shuttles * 1.1);
+  const tubes = Math.ceil(shuttlesBuf / 12);
+
+  // warnings
+  const warns = [];
+  if (overtime > 0) warns.push({ level: 'crit', text: `⏱ 超时 Overtime: 全部赛程需要 ${usedSlots} 个时段 (${usedSlots * cfg.matchMin} 分钟)，超出 ${overtime} 分钟。建议: 小组出线改「第 1 名」、每组改 3 队、减少队伍数、或缩短半决/决赛用时。(Over by ${overtime} min — try advancing only group winners, groups of 3, fewer teams, or a shorter SF/F duration.)` });
+  built.forEach(b => b.notes.forEach(n => warns.push({ level: 'warn', text: n })));
+  if (total > capacity) warns.push({ level: 'crit', text: `总场次 ${total} 场已超过场地容量 ${capacity} 场 (${cfg.courts} 场地 × ${slotsAvail} 时段)。(Total matches exceed raw court capacity.)` });
+
+  let html = '';
+
+  // tiles
+  html += `<div class="tiles">
+    <div class="tile"><div class="v">${total}</div><div class="k">总场次 Total matches</div></div>
+    <div class="tile"><div class="v">${usedSlots} / ${slotsAvail}</div><div class="k">时段 (每段 ${cfg.matchMin} 分钟) Time slots used</div></div>
+    <div class="tile ${overtime > 0 ? 'bad' : ''}"><div class="v">${endTime}</div><div class="k">预计结束 Est. finish ${overtime > 0 ? `(超时 +${overtime}min)` : '✓ 时间内 on time'}</div></div>
+    <div class="tile"><div class="v">${capacity ? Math.round(total / capacity * 100) : 0}%</div><div class="k">场地利用率 Court utilization</div></div>
+    <div class="tile"><div class="v">${tubes} 筒</div><div class="k">🪶 羽毛球 Shuttles ≈ ${shuttlesBuf} 粒 (友谊赛: 普通场×2 · 半决/决赛×4 · 含10%备用)</div></div>
+  </div>`;
+
+  for (const w of warns) html += `<div class="msg ${w.level}">${esc(w.text)}</div>`;
+
+  // legend
+  html += `<h2 class="sec">场地时间表 Court Grid <small>横向滑动查看全部时段 scroll → for all slots</small></h2>`;
+  html += `<div class="legend">` + CATS.map(c =>
+    `<span><span class="sw" style="background:var(--c-${c.key})"></span>${c.zh} ${c.key}</span>`).join('') +
+    `<span>| ① 小组第一 · ② 小组第二 · W 胜者 | 普通场: 单局 30 分 · ★ 半决/决赛: 21 分三局两胜 (best of 3 × 21)</span></div>`;
+
+  // court grid
+  const cols = Math.max(usedSlots, 1);
+  html += `<div class="gridwrap"><table class="court"><thead><tr><th>场地<br>Court</th>`;
+  for (let sl = 0; sl < cols; sl++) {
+    html += `<th class="${sl >= slotsAvail ? 'ot' : ''}">${timeAt(cfg.startTime, cfg.matchMin, sl)}${sl >= slotsAvail ? '<br>超时OT' : ''}</th>`;
+  }
+  html += `</tr></thead><tbody>`;
+  for (let c = 0; c < cfg.courts; c++) {
+    html += `<tr><th>${c + 1}</th>`;
+    let sl = 0;
+    while (sl < cols) {
+      const m = all.find(x => x.court === c && x.slot === sl);
+      if (m) {
+        html += `<td class="slot" colspan="${Math.min(m.durSlots, cols - sl)}"><span class="chip" style="--cat:var(--c-${m.cat});--catbg:var(--c-${m.cat}-bg)">${esc(m.code)}${m.special ? ' ★' : ''}<span class="who">${esc(m.a)} vs ${esc(m.b)}</span></span></td>`;
+        sl += m.durSlots;
+      } else {
+        html += `<td class="slot"></td>`;
+        sl++;
+      }
+    }
+    html += `</tr>`;
+  }
+  html += `</tbody></table></div>`;
+
+  // per-category detail
+  html += `<h2 class="sec">各项目详情 Category Details</h2>`;
+  for (const b of built) {
+    if (!b.matches.length) continue;
+    const c = b.cat;
+    html += `<div class="catsec" style="--cc:var(--c-${c.key})">
+      <h3>${c.zh} ${c.key}<small>${c.en} — ${c.teams} 队 · 小组赛 ${b.groupMatches} 场 + 淘汰赛 ${b.koMatches} 场 = ${b.matches.length} 场</small></h3>`;
+    if (b.groups.length && b.groups[0].name !== '—') {
+      html += `<div class="groups">` + b.groups.map(g =>
+        `<div class="groupbox"><b>${g.name}组${g.court != null ? ' · 场地' + (g.court + 1) : ''}</b> · ${g.teams.join(' · ')}</div>`).join('') + `</div>`;
+    }
+    html += `<div style="overflow-x:auto"><table class="mlist"><thead><tr><th>场次 Match</th><th>阶段 Phase</th><th>对阵 Players</th><th>时间 Time</th><th>场地 Court</th></tr></thead><tbody>`;
+    const sorted = [...b.matches].sort((x, y) => (x.slot ?? 999) - (y.slot ?? 999));
+    for (const m of sorted) {
+      html += `<tr><td class="code">${esc(m.code)}</td><td class="phase">${esc(m.roundLabel)}</td><td>${esc(m.a)} vs ${esc(m.b)}</td><td>${m.slot === null ? '—' : timeAt(cfg.startTime, cfg.matchMin, m.slot)}</td><td>${m.court === null ? '—' : m.court + 1}</td></tr>`;
+    }
+    html += `</tbody></table></div></div>`;
+  }
+
+  html += `<p class="note">备注: 每人只报名 1 个项目，不会跨项目撞场。同一组的所有比赛都排在同一个场地 — 该场地裁判用「打印场地表」附带的小组积分表记录成绩、算出线名额。T1、T2… 是队伍代号 — 报名截止后按抽签把真实名字对上即可。<br>
+  One category per player, so there are no cross-category clashes. All matches of a group are pinned to one court, and that court's judge tracks the group standings (printed at the bottom of each court sheet). T1, T2… are placeholders — map real names after the registration draw.</p>`;
+
+  results.innerHTML = html;
+}
+
+// ---------- random draw: shuffle name lists, then regenerate ----------
+function drawNames() {
+  let any = false;
+  for (const c of CATS) {
+    const el = document.getElementById('names_' + c.key);
+    const lines = el.value.split('\n').map(s => s.trim()).filter(Boolean);
+    if (lines.length < 2) continue;
+    any = true;
+    for (let i = lines.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [lines[i], lines[j]] = [lines[j], lines[i]];
+    }
+    el.value = lines.join('\n');
+  }
+  if (!any) document.getElementById('namesBox').open = true;
+  generate();
+}
+
+// ---------- printable score sheets: one card per match ----------
+function printScoreSheets() {
+  if (!lastRun) generate();
+  const { cfg, all } = lastRun;
+  const sorted = [...all].sort((a, b) => a.slot - b.slot || a.court - b.court);
+  const sheets = document.getElementById('sheets');
+  sheets.innerHTML = '<div class="sheetgrid">' + sorted.map(m => {
+    const cat = CATS.find(c => c.key === m.cat);
+    const boxes = '<td class="box"></td>'.repeat(m.special ? 3 : 1);
+    const fmt = m.special ? '21 分 · 三局两胜 best of 3 × 21' : '单局 30 分 · 1 game to 30';
+    return `<div class="scard" style="--cc:var(--c-${m.cat})">
+      <div class="shead"><b>${esc(m.code)}</b><span>${cat.zh} · ${esc(m.roundLabel)}</span><span>${fmt}</span><span>${timeAt(cfg.startTime, cfg.matchMin, m.slot)} · 场地 Court ${m.court + 1}</span></div>
+      <table class="stab">
+        <tr><td class="pl">${esc(m.a)}</td>${boxes}</tr>
+        <tr><td class="pl">${esc(m.b)}</td>${boxes}</tr>
+      </table>
+      <div class="swin">胜方 Winner: ______________　裁判 Umpire: ______________</div>
+    </div>`;
+  }).join('') + '</div>';
+  document.body.classList.add('sheets-mode');
+  const cleanup = () => { document.body.classList.remove('sheets-mode'); window.removeEventListener('afterprint', cleanup); };
+  window.addEventListener('afterprint', cleanup);
+  window.print();
+}
+
+// ---------- per-court referee schedules: one page per court ----------
+function printCourtSheets() {
+  if (!lastRun) generate();
+  const { cfg, all } = lastRun;
+  let html = '';
+  for (let c = 0; c < cfg.courts; c++) {
+    const ms = all.filter(m => m.court === c).sort((a, b) => a.slot - b.slot);
+    if (!ms.length) continue;
+    html += `<div class="courtpage">
+      <div class="cphead"><span class="cpnum">场地 Court ${c + 1}</span><span>滨海林氏青年团羽毛球赛 · 裁判赛程表 Referee Schedule</span></div>
+      <table class="cptab"><thead><tr>
+        <th>时间 Time</th><th>场次 Match</th><th>项目 · 阶段 Category · Phase</th><th>对阵 Players</th><th>比分 Score</th><th>胜方 Winner</th>
+      </tr></thead><tbody>`;
+    for (const m of ms) {
+      const cat = CATS.find(x => x.key === m.cat);
+      html += `<tr>
+        <td class="t">${timeAt(cfg.startTime, cfg.matchMin, m.slot)}</td>
+        <td class="mc" style="--cc:var(--c-${m.cat})">${esc(m.code)}</td>
+        <td class="ph">${cat.zh} ${m.cat} · ${esc(m.roundLabel)} · ${m.special ? '21分×3局' : '单局30分'}</td>
+        <td class="pv">${esc(m.a)}　vs　${esc(m.b)}</td>
+        <td class="blank-score"></td><td class="blank-win"></td>
+      </tr>`;
+    }
+    html += `</tbody></table>`;
+    // 小组积分表: standings table for every group hosted on this court — the judge fills scores
+    // into the matrix, counts wins, and ranks who advances
+    for (const g of (lastRun.groupsList || []).filter(x => x.court === c)) {
+      const gcat = CATS.find(x => x.key === g.cat);
+      const advTxt = g.name === '—'
+        ? '胜场最多者冠军 most wins = champion'
+        : `前 ${g.adv} 名晋级淘汰赛 top ${g.adv} advance`;
+      html += `<div class="gsheet">
+        <div class="gtitle" style="--cc:var(--c-${g.cat})">${gcat.zh} ${g.cat} · ${g.name === '—' ? '循环赛' : g.name + '组'} 小组积分表 Group Standings <span>格内写比分 write scores in grid · ${advTxt}</span></div>
+        <table class="gtabx"><tr><th class="tn">队伍 Team</th>${g.teams.map((_, i) => `<th>vs ${i + 1}</th>`).join('')}<th>胜场 Wins</th><th>名次 Rank</th></tr>` +
+        g.teams.map((t, i) =>
+          `<tr><td class="tn">${i + 1}. ${esc(t)}</td>${g.teams.map((_, j) => j === i ? '<td class="diag"></td>' : '<td></td>').join('')}<td></td><td></td></tr>`).join('') +
+        `</table></div>`;
+    }
+    html += `</div>`;
+  }
+  document.getElementById('sheets').innerHTML = html;
+  document.body.classList.add('sheets-mode');
+  const cleanup = () => { document.body.classList.remove('sheets-mode'); window.removeEventListener('afterprint', cleanup); };
+  window.addEventListener('afterprint', cleanup);
+  window.print();
+}
+
+// ---------- CSV ----------
+function downloadCSV() {
+  if (!lastRun) generate();
+  const { cfg, all } = lastRun;
+  const rows = [['时间 Time', '场地 Court', '项目 Category', '场次 Match', '阶段 Phase', '赛制 Format', '队伍A Team A', '队伍B Team B', '比分 Score', '胜方 Winner']];
+  const sorted = [...all].sort((a, b) => a.slot - b.slot || a.court - b.court);
+  for (const m of sorted) {
+    const cat = CATS.find(c => c.key === m.cat);
+    rows.push([timeAt(cfg.startTime, cfg.matchMin, m.slot), m.court + 1, `${cat.zh} ${m.cat}`, m.code, m.roundLabel, m.special ? '21分×3局' : '单局30分', m.a, m.b, '', '']);
+  }
+  const csv = '﻿' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'badminton-schedule.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+document.getElementById('genBtn').addEventListener('click', generate);
+document.getElementById('drawBtn').addEventListener('click', drawNames);
+document.getElementById('courtBtn').addEventListener('click', printCourtSheets);
+document.getElementById('sheetBtn').addEventListener('click', printScoreSheets);
+document.getElementById('csvBtn').addEventListener('click', downloadCSV);
+document.getElementById('printBtn').addEventListener('click', () => window.print());
+generate();
+</script>
