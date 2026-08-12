@@ -168,10 +168,26 @@
   }
   .qhit .qwhen { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--cc); }
   .qhit .qfirst { background: var(--cc); color: var(--surface); border-radius: 5px; padding: 1px 7px; font-size: .72rem; margin-right: 4px; }
-  .cfg-toggle { margin-top: 10px; display: none; }
+  .hidden { display: none !important; }
+  .rolebar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; align-items: center; }
+  .rolebtn {
+    font: inherit; font-size: .88rem; font-weight: 700; cursor: pointer; padding: 8px 16px;
+    border-radius: 8px; border: 1px solid var(--line); background: var(--surface2); color: var(--ink2);
+  }
+  .rolebtn.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  #coachCourt {
+    font: inherit; font-size: .9rem; font-weight: 700; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  }
+  .cvtitle { margin: 4px 0 8px; font-size: 1rem; }
+  .cvdest { font-size: .74rem; font-weight: 700; color: var(--accent); }
+  .cnext {
+    border: 1.5px solid var(--accent); border-radius: 8px; padding: 8px 12px; margin-top: 8px;
+    font-size: .85rem; font-weight: 700; color: var(--accent);
+  }
+  .cnext small { display: block; color: var(--ink2); font-weight: 500; }
+  /* members opening a shared link never see the settings — admin uses the base link */
   body.shared .controls { display: none; }
-  body.shared .cfg-toggle { display: inline-block; }
-  body.shared.show-cfg .controls { display: grid; }
 
   @media (max-width: 620px) {
     .wrap { padding: 14px 10px 40px; }
@@ -250,10 +266,16 @@
   </header>
 
   <div class="panel searchbox">
-    <p class="eyebrow">🔍 查询我的比赛 Find My Matches</p>
-    <input id="q" type="search" placeholder="输入你的名字或队号 Type your name, e.g. 林小明 / T3" autocomplete="off">
-    <div id="qresults"></div>
-    <button class="ghost cfg-toggle" id="cfgToggle">⚙️ 显示/隐藏设置 Show/Hide Settings</button>
+    <div class="rolebar">
+      <button class="rolebtn active" id="roleP">🔍 球员 Player</button>
+      <button class="rolebtn" id="roleC">🧑‍⚖️ 裁判 Coach</button>
+      <select id="coachCourt" class="hidden"></select>
+    </div>
+    <div id="playerView">
+      <input id="q" type="search" placeholder="输入你的名字或队号 Type your name, e.g. 林小明 / T3" autocomplete="off">
+      <div id="qresults"></div>
+    </div>
+    <div id="coachview" class="hidden"></div>
   </div>
 
   <div class="panel controls">
@@ -688,7 +710,14 @@ function generate() {
   One category per player, so there are no cross-category clashes. All matches of a group are pinned to one court, and that court's judge tracks the group standings (printed at the bottom of each court sheet). T1, T2… are placeholders — map real names after the registration draw.</p>`;
 
   results.innerHTML = html;
+  // keep the court dropdown in sync with the court count
+  const sel = document.getElementById('coachCourt');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">选场地 Court #</option>' +
+    Array.from({ length: cfg.courts }, (_, i) => `<option value="${i + 1}">场地 Court ${i + 1}</option>`).join('');
+  if (prev && parseInt(prev, 10) <= cfg.courts) sel.value = prev;
   doSearch(); // refresh "find my matches" results against the new schedule
+  renderCoachView();
 }
 
 // ---------- random draw: shuffle name lists, then regenerate ----------
@@ -888,9 +917,56 @@ function shareLink() {
   history.replaceState(null, '', url); // also show it in the address bar
 }
 
+// ---------- coach view: one court's schedule + its groups, phone-friendly ----------
+function renderCoachView() {
+  const box = document.getElementById('coachview');
+  const sel = document.getElementById('coachCourt');
+  if (!lastRun) { box.innerHTML = ''; return; }
+  const c = parseInt(sel.value, 10) - 1;
+  if (isNaN(c)) { box.innerHTML = '<p class="note">请选择场地号 Select your court number.</p>'; return; }
+  const { cfg, all, groupsList } = lastRun;
+  const ms = all.filter(m => m.court === c).sort((a, b) => a.slot - b.slot);
+  let html = `<h3 class="cvtitle">场地 Court ${c + 1} — ${ms.length} 场比赛 matches</h3>`;
+  html += `<div style="overflow-x:auto"><table class="mlist"><thead><tr><th>时间 Time</th><th>场次 Match</th><th>对阵 Players</th></tr></thead><tbody>`;
+  for (const m of ms) {
+    const cat = CATS.find(x => x.key === m.cat);
+    let dest = '';
+    if (m.phase === 'ko') {
+      const d = destOf(`${m.cat}:W:${m.uid}`);
+      dest = `<div class="cvdest">${d ? '➜ 胜者去 ' + esc(d) : '🏆 冠军 Champion!'}</div>`;
+    }
+    html += `<tr><td class="code" style="--cc:var(--c-${m.cat})">${timeAt(cfg.startTime, cfg.matchMin, m.slot)}</td>
+      <td class="phase">${esc(m.code)}<br>${cat.zh} · ${m.special ? '21分×3局' : '单局30分'}</td>
+      <td>${esc(m.a)} vs ${esc(m.b)}${dest}</td></tr>`;
+  }
+  html += `</tbody></table></div>`;
+  for (const g of (groupsList || []).filter(x => x.court === c)) {
+    const gcat = CATS.find(x => x.key === g.cat);
+    html += `<div class="cnext">${gcat.zh} ${g.name === '—' ? '循环赛' : g.name + '组'}: ${g.teams.map(esc).join(' · ')}<small>胜=1分, 积分最高晋级。请用打印的积分表记录成绩。Win = 1 pt; record scores on the printed standings sheet.</small>`;
+    if (g.name !== '—') {
+      for (let k = 1; k <= g.adv; k++) {
+        const d = destOf(`${g.cat}:${g.name}:${k}`);
+        html += `<div>第 ${k} 名 ➜ ${d ? esc(d) : '冠军 🏆'}</div>`;
+      }
+    }
+    html += `</div>`;
+  }
+  box.innerHTML = html;
+}
+function setRole(r) {
+  document.getElementById('roleP').classList.toggle('active', r === 'player');
+  document.getElementById('roleC').classList.toggle('active', r === 'coach');
+  document.getElementById('playerView').classList.toggle('hidden', r !== 'player');
+  document.getElementById('coachview').classList.toggle('hidden', r !== 'coach');
+  document.getElementById('coachCourt').classList.toggle('hidden', r !== 'coach');
+  if (r === 'coach') renderCoachView();
+}
+
+document.getElementById('roleP').addEventListener('click', () => setRole('player'));
+document.getElementById('roleC').addEventListener('click', () => setRole('coach'));
+document.getElementById('coachCourt').addEventListener('change', renderCoachView);
 document.getElementById('q').addEventListener('input', doSearch);
 document.getElementById('shareBtn').addEventListener('click', shareLink);
-document.getElementById('cfgToggle').addEventListener('click', () => document.body.classList.toggle('show-cfg'));
 document.getElementById('genBtn').addEventListener('click', generate);
 document.getElementById('drawBtn').addEventListener('click', drawNames);
 document.getElementById('courtBtn').addEventListener('click', printCourtSheets);
